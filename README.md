@@ -23,15 +23,15 @@ This project uses a U-Net architecture to identify and segment different feature
 
 ## Model
 
-**Architecture**: U-Net (PyTorch Lightning)
+**Architecture**: U-Net (TensorFlow/Keras)
 - Encoder-decoder with skip connections
 - Input: RGB images (256x256)
 - Output: 6-class segmentation mask
-- Loss: CrossEntropyLoss
+- Loss: SparseCategoricalCrossentropy
 - Optimizer: AdamW (lr=1e-4)
 
 **Training:**
-- 50 epochs (~30-60 min on T4 x2 GPU)
+- 50 epochs (~30-60 min on GPU)
 - Batch size: 16
 - Train/Val/Test split: 70/20/10
 
