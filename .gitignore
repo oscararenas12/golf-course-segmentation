@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Dataset (too large for git)
+data/
+dataset/
+*.jpg
+*.png
+*.zip
+
+# Model weights
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+
+# PyTorch Lightning logs
+lightning_logs/
+wandb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Training outputs
+outputs/
+results/
+predictions/
