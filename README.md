@@ -41,43 +41,6 @@ This project uses a U-Net architecture to identify and segment different feature
 - **Global Coverage**: Expand beyond Danish courses to worldwide golf courses using satellite imagery APIs
 - **Real-time Inference**: Segment courses on-demand when users zoom to certain map levels
 
-## Setup
-
-```bash
-# Clone repository
-git clone <repo-url>
-cd golf-course-segmentation
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Download dataset (requires kagglehub or manual download)
-python download_dataset.py
-```
-
-## Project Structure
-
-```
-golf-course-segmentation/
-├── data/               # Dataset directory (not tracked)
-├── models/             # Saved model weights
-├── notebooks/          # Jupyter notebooks
-├── src/                # Source code
-│   ├── model.py       # U-Net model definition
-│   ├── dataset.py     # Dataset and DataModule classes
-│   └── train.py       # Training script
-├── requirements.txt
-└── README.md
-```
-
-## License
-
-Dataset: Database: Open Database, Contents: © Original Authors (Open Data Commons)
-
 ## Credits
 
 Based on Kaggle notebook by [viniciussmatthiesen](https://www.kaggle.com/code/viniciussmatthiesen/semantic-segmentation-of-danish-golf-courses-u-net)
