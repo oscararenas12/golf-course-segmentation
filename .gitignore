@@ -10,8 +10,8 @@ build/
 
 # Virtual environment
 .venv/
-venv/
-env/
+.venv-wsl2/
+
 
 # Jupyter
 .ipynb_checkpoints/
@@ -29,10 +29,7 @@ dataset/
 *.pth
 *.ckpt
 checkpoints/
-
-# PyTorch Lightning logs
-lightning_logs/
-wandb/
+logs/
 
 # IDE
 .vscode/

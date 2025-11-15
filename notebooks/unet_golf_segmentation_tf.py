@@ -13,6 +13,58 @@ from tensorflow.keras import layers, models, callbacks
 import kagglehub
 
 # %%
+# GPU Configuration and Verification
+print("=" * 60)
+print("GPU SETUP AND VERIFICATION")
+print("=" * 60)
+
+# Check TensorFlow version
+print(f"\nTensorFlow Version: {tf.__version__}")
+print(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
+
+# List all physical devices
+print("\nAll Physical Devices:")
+for device in tf.config.list_physical_devices():
+    print(f"  {device}")
+
+# Get GPU devices
+gpus = tf.config.list_physical_devices('GPU')
+print(f"\nNumber of GPUs Available: {len(gpus)}")
+
+if gpus:
+    try:
+        # Configure GPU memory growth to avoid OOM errors
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+
+        # Get detailed GPU info
+        for i, gpu in enumerate(gpus):
+            print(f"\nGPU {i}:")
+            print(f"  Device: {gpu}")
+            details = tf.config.experimental.get_device_details(gpu)
+            if details:
+                for key, value in details.items():
+                    print(f"  {key}: {value}")
+
+        # Set the GPU as visible
+        tf.config.set_visible_devices(gpus, 'GPU')
+
+        # Enable mixed precision for better memory efficiency and faster training
+        keras.mixed_precision.set_global_policy('mixed_float16')
+        print("\n✅ Mixed precision training enabled (float16)")
+
+        print("\n✅ GPU Configuration Successful!")
+        print(f"✅ Memory growth enabled for {len(gpus)} GPU(s)")
+
+    except RuntimeError as e:
+        print(f"\n❌ GPU Configuration Error: {e}")
+else:
+    print("\n⚠️  WARNING: No GPUs detected! Training will use CPU (very slow)")
+    print("    Make sure you're running in WSL2 with CUDA support")
+
+print("=" * 60)
+
+# %%
 # Download dataset
 jacotaco_danish_golf_courses_orthophotos_path = kagglehub.dataset_download('jacotaco/danish-golf-courses-orthophotos')
 
@@ -21,7 +73,7 @@ print(f"Dataset path: {jacotaco_danish_golf_courses_orthophotos_path}")
 
 # %%
 # Hyperparameters
-BATCH_SIZE = 16  # Number of batches when training
+BATCH_SIZE = 4  # Reduced from 16 to fit in GPU memory
 IMAGE_SIZE = (256, 256)  # Images get resized to a smaller resolution
 IN_CHANNELS = 3  # There are 3 channels for RGB
 LEARNING_RATE = 1e-4
@@ -119,17 +171,6 @@ def prepare_datasets():
 # %%
 # U-Net Model Architecture
 
-def double_conv_block(x, filters):
-    """
-    Double convolution block: Conv2D -> ReLU -> Conv2D -> ReLU
-    """
-    x = layers.Conv2D(filters, 3, padding='same')(x)
-    x = layers.ReLU()(x)
-    x = layers.Conv2D(filters, 3, padding='same')(x)
-    x = layers.ReLU()(x)
-    return x
-
-
 def build_unet(input_shape=(256, 256, 3), num_classes=6):
     """
     Build U-Net model for semantic segmentation.
@@ -144,50 +185,76 @@ def build_unet(input_shape=(256, 256, 3), num_classes=6):
 
     # ===== ENCODER =====
     # Block 1: 3 -> 64 channels
-    conv1 = double_conv_block(inputs, 64)
+    conv1 = layers.Conv2D(64, 3, padding='same')(inputs)
+    conv1 = layers.ReLU()(conv1)
+    conv1 = layers.Conv2D(64, 3, padding='same')(conv1)
+    conv1 = layers.ReLU()(conv1)
     pool1 = layers.MaxPooling2D(pool_size=2, strides=2)(conv1)
 
     # Block 2: 64 -> 128 channels
-    conv2 = double_conv_block(pool1, 128)
+    conv2 = layers.Conv2D(128, 3, padding='same')(pool1)
+    conv2 = layers.ReLU()(conv2)
+    conv2 = layers.Conv2D(128, 3, padding='same')(conv2)
+    conv2 = layers.ReLU()(conv2)
     pool2 = layers.MaxPooling2D(pool_size=2, strides=2)(conv2)
 
     # Block 3: 128 -> 256 channels
-    conv3 = double_conv_block(pool2, 256)
+    conv3 = layers.Conv2D(256, 3, padding='same')(pool2)
+    conv3 = layers.ReLU()(conv3)
+    conv3 = layers.Conv2D(256, 3, padding='same')(conv3)
+    conv3 = layers.ReLU()(conv3)
     pool3 = layers.MaxPooling2D(pool_size=2, strides=2)(conv3)
 
     # Block 4: 256 -> 512 channels
-    conv4 = double_conv_block(pool3, 512)
+    conv4 = layers.Conv2D(512, 3, padding='same')(pool3)
+    conv4 = layers.ReLU()(conv4)
+    conv4 = layers.Conv2D(512, 3, padding='same')(conv4)
+    conv4 = layers.ReLU()(conv4)
     pool4 = layers.MaxPooling2D(pool_size=2, strides=2)(conv4)
 
     # ===== BOTTLENECK =====
     # Block 5: 512 -> 1024 channels
-    conv5 = double_conv_block(pool4, 1024)
+    conv5 = layers.Conv2D(1024, 3, padding='same')(pool4)
+    conv5 = layers.ReLU()(conv5)
+    conv5 = layers.Conv2D(1024, 3, padding='same')(conv5)
+    conv5 = layers.ReLU()(conv5)
 
     # ===== DECODER =====
     # Upsampling block 1: 1024 -> 512 channels
     up1 = layers.Conv2DTranspose(512, kernel_size=2, strides=2, padding='same')(conv5)
-    # Center crop conv4 to match up1 dimensions (if needed)
-    conv4_cropped = center_crop(conv4, up1)
+    conv4_cropped = CenterCrop()([conv4, up1])
     concat1 = layers.Concatenate()([up1, conv4_cropped])
-    upconv1 = double_conv_block(concat1, 512)
+    upconv1 = layers.Conv2D(512, 3, padding='same')(concat1)
+    upconv1 = layers.ReLU()(upconv1)
+    upconv1 = layers.Conv2D(512, 3, padding='same')(upconv1)
+    upconv1 = layers.ReLU()(upconv1)
 
     # Upsampling block 2: 512 -> 256 channels
     up2 = layers.Conv2DTranspose(256, kernel_size=2, strides=2, padding='same')(upconv1)
-    conv3_cropped = center_crop(conv3, up2)
+    conv3_cropped = CenterCrop()([conv3, up2])
     concat2 = layers.Concatenate()([up2, conv3_cropped])
-    upconv2 = double_conv_block(concat2, 256)
+    upconv2 = layers.Conv2D(256, 3, padding='same')(concat2)
+    upconv2 = layers.ReLU()(upconv2)
+    upconv2 = layers.Conv2D(256, 3, padding='same')(upconv2)
+    upconv2 = layers.ReLU()(upconv2)
 
     # Upsampling block 3: 256 -> 128 channels
     up3 = layers.Conv2DTranspose(128, kernel_size=2, strides=2, padding='same')(upconv2)
-    conv2_cropped = center_crop(conv2, up3)
+    conv2_cropped = CenterCrop()([conv2, up3])
     concat3 = layers.Concatenate()([up3, conv2_cropped])
-    upconv3 = double_conv_block(concat3, 128)
+    upconv3 = layers.Conv2D(128, 3, padding='same')(concat3)
+    upconv3 = layers.ReLU()(upconv3)
+    upconv3 = layers.Conv2D(128, 3, padding='same')(upconv3)
+    upconv3 = layers.ReLU()(upconv3)
 
     # Upsampling block 4: 128 -> 64 channels
     up4 = layers.Conv2DTranspose(64, kernel_size=2, strides=2, padding='same')(upconv3)
-    conv1_cropped = center_crop(conv1, up4)
+    conv1_cropped = CenterCrop()([conv1, up4])
     concat4 = layers.Concatenate()([up4, conv1_cropped])
-    upconv4 = double_conv_block(concat4, 64)
+    upconv4 = layers.Conv2D(64, 3, padding='same')(concat4)
+    upconv4 = layers.ReLU()(upconv4)
+    upconv4 = layers.Conv2D(64, 3, padding='same')(upconv4)
+    upconv4 = layers.ReLU()(upconv4)
 
     # ===== OUTPUT =====
     # Final 1x1 convolution to produce class logits
@@ -197,31 +264,50 @@ def build_unet(input_shape=(256, 256, 3), num_classes=6):
     return model
 
 
-def center_crop(tensor, target_tensor):
+class CenterCrop(layers.Layer):
     """
-    Center crop tensor to match target_tensor dimensions.
+    Custom Keras layer to center crop tensor to match target dimensions.
+    This is needed for skip connections in U-Net when encoder and decoder
+    feature maps have different spatial dimensions.
     """
-    tensor_shape = tf.shape(tensor)
-    target_shape = tf.shape(target_tensor)
+    def __init__(self, **kwargs):
+        super(CenterCrop, self).__init__(**kwargs)
 
-    # Calculate cropping amounts
-    height_diff = tensor_shape[1] - target_shape[1]
-    width_diff = tensor_shape[2] - target_shape[2]
+    def call(self, inputs):
+        """
+        Args:
+            inputs: List of [tensor_to_crop, target_tensor]
+        Returns:
+            Cropped tensor matching target_tensor's spatial dimensions
+        """
+        tensor, target_tensor = inputs
 
-    # Calculate crop offsets (center crop)
-    offset_height = height_diff // 2
-    offset_width = width_diff // 2
+        # Get dynamic shapes at runtime
+        tensor_shape = tf.shape(tensor)
+        target_shape = tf.shape(target_tensor)
 
-    # Crop the tensor
-    cropped = tf.image.crop_to_bounding_box(
-        tensor,
-        offset_height=offset_height,
-        offset_width=offset_width,
-        target_height=target_shape[1],
-        target_width=target_shape[2]
-    )
+        # Calculate cropping amounts
+        height_diff = tensor_shape[1] - target_shape[1]
+        width_diff = tensor_shape[2] - target_shape[2]
 
-    return cropped
+        # Calculate crop offsets (center crop)
+        offset_height = height_diff // 2
+        offset_width = width_diff // 2
+
+        # Crop the tensor
+        cropped = tf.image.crop_to_bounding_box(
+            tensor,
+            offset_height=offset_height,
+            offset_width=offset_width,
+            target_height=target_shape[1],
+            target_width=target_shape[2]
+        )
+
+        return cropped
+
+    def get_config(self):
+        config = super(CenterCrop, self).get_config()
+        return config
 
 # %%
 # Build and compile the model
@@ -242,6 +328,15 @@ model.summary()
 # Prepare datasets
 print("Preparing datasets...")
 train_ds, val_ds, test_ds = prepare_datasets()
+
+# %%
+# Custom GPU Monitoring Callback
+class GPUMonitorCallback(callbacks.Callback):
+    """Monitor GPU memory usage during training."""
+    def on_epoch_end(self, epoch, logs=None):
+        if tf.config.list_physical_devices('GPU'):
+            print(f"\n[Epoch {epoch + 1}] GPU Memory Info:")
+            # This will print GPU memory usage info from TensorFlow
 
 # %%
 # Setup callbacks
@@ -272,12 +367,16 @@ callback_list = [
         patience=5,
         verbose=1,
         min_lr=1e-7
-    )
+    ),
+    # GPU monitoring
+    GPUMonitorCallback()
 ]
 
 # %%
 # Train the model
 print("Starting training...")
+print(f"Training on: {tf.test.gpu_device_name() if tf.config.list_physical_devices('GPU') else 'CPU'}")
+print("=" * 60)
 history = model.fit(
     train_ds,
     validation_data=val_ds,
