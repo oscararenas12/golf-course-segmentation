@@ -30,6 +30,7 @@ dataset/
 *.ckpt
 checkpoints/
 logs/
+best_unet_model.keras
 
 # IDE
 .vscode/
