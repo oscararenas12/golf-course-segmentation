@@ -30,7 +30,21 @@ dataset/
 *.ckpt
 checkpoints/
 logs/
+
+# Segmentation model
 best_unet_model.keras
+final_unet_model.keras
+
+# Classifier model
+classifier/best_golf_classifier.keras
+classifier/final_golf_classifier.keras
+classifier/logs/
+
+# Augmented classifier
+classifier/augmented/best_golf_classifier.keras
+classifier/augmented/final_golf_classifier.keras
+classifier/augmented/logs/
+classifier/augmented/*.png
 
 # IDE
 .vscode/
@@ -46,3 +60,4 @@ Thumbs.db
 outputs/
 results/
 predictions/
+ucmerced_predictions/

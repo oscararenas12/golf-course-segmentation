@@ -538,3 +538,5 @@ print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
 print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
 print(f"Final Validation Accuracy: {history.history['val_accuracy'][-1]:.4f}")
 print(f"Best Validation Loss: {min(history.history['val_loss']):.4f}")
+
+# %%
