@@ -35,6 +35,12 @@ logs/
 best_unet_model.keras
 final_unet_model.keras
 
+# Large model files (>100MB - too large for GitHub)
+models/*.keras
+models/*.h5
+models/*.weights
+*.keras
+
 # Classifier model
 classifier/best_golf_classifier.keras
 classifier/final_golf_classifier.keras
@@ -49,6 +55,7 @@ classifier/augmented/*.png
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
@@ -61,3 +68,27 @@ outputs/
 results/
 predictions/
 ucmerced_predictions/
+
+# Next.js
+.next/
+out/
+node_modules/
+*.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment variables
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# API environment
+api/.env
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
