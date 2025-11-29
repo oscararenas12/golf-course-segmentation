@@ -336,23 +336,50 @@ export function MapArea({
 
   // Update overlay when segmentation result or opacity changes
   useEffect(() => {
-    if (mapInstanceRef.current && segmentationResult && overlayBoundsRef.current) {
+    console.log('Overlay effect triggered:', {
+      hasMap: !!mapInstanceRef.current,
+      hasResult: !!segmentationResult,
+      hasBounds: !!overlayBoundsRef.current,
+      overlayDataLength: segmentationResult?.overlayData?.length || 0,
+    });
+
+    if (mapInstanceRef.current && segmentationResult && segmentationResult.overlayData) {
       // Remove existing overlay
       if (overlayRef.current) {
         overlayRef.current.setMap(null);
       }
 
-      // Use the exact bounds that were calculated during capture
-      const overlay = new google.maps.GroundOverlay(
-        segmentationResult.overlayData,
-        overlayBoundsRef.current,
-        {
-          opacity: overlayOpacity / 100,
+      // If no bounds were captured, create default bounds around current center
+      let bounds = overlayBoundsRef.current;
+      if (!bounds) {
+        const center = mapInstanceRef.current.getCenter();
+        if (center) {
+          // Create bounds based on approximate capture area
+          const lat = center.lat();
+          const lng = center.lng();
+          const latOffset = 0.01; // Approximate degrees for overlay size
+          const lngOffset = 0.015;
+          bounds = new google.maps.LatLngBounds(
+            new google.maps.LatLng(lat - latOffset, lng - lngOffset),
+            new google.maps.LatLng(lat + latOffset, lng + lngOffset)
+          );
         }
-      );
+      }
 
-      overlay.setMap(mapInstanceRef.current);
-      overlayRef.current = overlay;
+      if (bounds) {
+        // Use the exact bounds that were calculated during capture
+        const overlay = new google.maps.GroundOverlay(
+          segmentationResult.overlayData,
+          bounds,
+          {
+            opacity: overlayOpacity / 100,
+          }
+        );
+
+        overlay.setMap(mapInstanceRef.current);
+        overlayRef.current = overlay;
+        console.log('Overlay created successfully');
+      }
     }
   }, [segmentationResult, overlayOpacity]);
 

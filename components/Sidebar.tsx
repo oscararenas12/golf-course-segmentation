@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Search, MapPin, Target, Trash2, ArrowLeftRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,10 +8,12 @@ import { Checkbox } from './ui/checkbox';
 import { Legend } from './Legend';
 import { Statistics } from './Statistics';
 import { DatasetCapture } from './DatasetCapture';
+import { ClassificationCapture } from './ClassificationCapture';
 import { SegmentationResult } from '../app/page';
 import { Separator } from './ui/separator';
 
 type WorkflowMode = 'dataset' | 'segmentation';
+type DatasetType = 'segmentation' | 'classification';
 
 interface SidebarProps {
   workflowMode: WorkflowMode;
@@ -53,6 +56,8 @@ export function Sidebar({
   onSwitchWorkflow,
   onTriggerCapture,
 }: SidebarProps) {
+  const [datasetType, setDatasetType] = useState<DatasetType>('segmentation');
+
   return (
     <aside className="w-[300px] bg-slate-800 border-r border-slate-700 overflow-y-auto">
       <div className="p-6 space-y-6">
@@ -154,13 +159,46 @@ export function Sidebar({
         {/* Dataset Capture Section - Only show in dataset mode */}
         {workflowMode === 'dataset' && (
           <>
-            <DatasetCapture
-              mapCenter={mapCenter}
-              segmentationResult={segmentationResult}
-              capturedImageData={capturedImageData}
-              workflowMode={workflowMode}
-              onTriggerCapture={onTriggerCapture}
-            />
+            {/* Dataset Type Toggle */}
+            <div className="bg-slate-700/30 rounded-lg p-1 flex mb-4">
+              <button
+                onClick={() => setDatasetType('segmentation')}
+                className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                  datasetType === 'segmentation'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🎨 Segmentation
+              </button>
+              <button
+                onClick={() => setDatasetType('classification')}
+                className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                  datasetType === 'classification'
+                    ? 'bg-orange-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🏷️ Classification
+              </button>
+            </div>
+
+            {/* Show appropriate capture component */}
+            {datasetType === 'segmentation' ? (
+              <DatasetCapture
+                mapCenter={mapCenter}
+                segmentationResult={segmentationResult}
+                capturedImageData={capturedImageData}
+                workflowMode={workflowMode}
+                onTriggerCapture={onTriggerCapture}
+              />
+            ) : (
+              <ClassificationCapture
+                mapCenter={mapCenter}
+                capturedImageData={capturedImageData}
+                onTriggerCapture={onTriggerCapture}
+              />
+            )}
             <Separator className="bg-slate-700" />
           </>
         )}
