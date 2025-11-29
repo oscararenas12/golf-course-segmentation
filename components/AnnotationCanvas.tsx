@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { Label } from './ui/label';
-import { Undo2, Redo2, Eraser, Save, X, Eye, EyeOff, Sparkles, MousePointer2, Paintbrush, MessageSquare, Send, Bot, ChevronRight, ChevronLeft, Check, RefreshCw } from 'lucide-react';
+import { Undo2, Redo2, Eraser, Save, X, Eye, EyeOff, Sparkles, Paintbrush } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AnnotationCanvasProps {
@@ -27,19 +27,6 @@ interface HistoryState {
   imageData: string;
 }
 
-interface AiMessage {
-  role: 'assistant' | 'user';
-  content: string;
-  timestamp: Date;
-  features?: { class: string; centerX: number; centerY: number; radius: number }[];
-  colorProfiles?: { [key: string]: any };
-}
-
-interface AiAnalysis {
-  features: { class: string; centerX: number; centerY: number; radius: number }[];
-  colorProfiles: { [key: string]: any };
-}
-
 export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose }: AnnotationCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,16 +45,7 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSamProcessing, setIsSamProcessing] = useState(false);
-
-  // AI Chat Panel State
-  const [showAiPanel, setShowAiPanel] = useState(true);
-  const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
-  const [userFeedback, setUserFeedback] = useState('');
-  const [currentAnalysis, setCurrentAnalysis] = useState<AiAnalysis | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // Initialize canvases
   useEffect(() => {
@@ -390,332 +368,17 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
     }
   };
 
-  // Scroll chat to bottom when new messages arrive
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [aiMessages]);
-
-  // AI Analysis - Get suggestions from GPT-4 without applying
-  const handleAiAnalyze = async (feedback?: string) => {
-    setIsAnalyzing(true);
-
-    // Add user feedback message if provided
-    if (feedback) {
-      setAiMessages(prev => [...prev, {
-        role: 'user',
-        content: feedback,
-        timestamp: new Date(),
-      }]);
-      setUserFeedback('');
-    }
-
-    try {
-      const gptResponse = await fetch('/api/gpt-classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageData,
-          feedback: feedback || undefined,
-        }),
-      });
-
-      if (!gptResponse.ok) {
-        throw new Error('Failed to analyze image');
-      }
-
-      const data = await gptResponse.json();
-      const features = data.features || [];
-      const colorProfiles = data.colorProfiles || {};
-
-      setCurrentAnalysis({ features, colorProfiles });
-
-      // Build analysis message
-      const featureCounts: { [key: string]: number } = {};
-      features.forEach((f: any) => {
-        featureCounts[f.class] = (featureCounts[f.class] || 0) + 1;
-      });
-
-      const featureSummary = Object.entries(featureCounts)
-        .map(([cls, count]) => `${count} ${cls}${count > 1 ? 's' : ''}`)
-        .join(', ') || 'No features detected';
-
-      // Build detailed color profile description
-      const colorClasses = Object.keys(colorProfiles);
-      const colorDetails = colorClasses.map(cls => {
-        const cp = colorProfiles[cls];
-        return `**${cls}:**\n  R: ${cp.minR}-${cp.maxR} | G: ${cp.minG}-${cp.maxG} | B: ${cp.minB}-${cp.maxB}\n  Brightness: ${cp.minBrightness}-${cp.maxBrightness}`;
-      }).join('\n\n');
-
-      const analysisMessage = `**Analysis Complete**\n\n**Feature Locations:** ${featureSummary}\n\n**Color Profiles (RGB ranges for this image):**\n\n${colorDetails || 'No color profiles detected'}\n\nClick "Apply" to segment with these colors, or provide feedback to refine.`;
-
-      setAiMessages(prev => [...prev, {
-        role: 'assistant',
-        content: analysisMessage,
-        timestamp: new Date(),
-        features,
-        colorProfiles,
-      }]);
-
-    } catch (error: any) {
-      setAiMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ Analysis failed: ${error.message}`,
-        timestamp: new Date(),
-      }]);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  // Apply the current AI analysis with SAM
-  const handleApplyAnalysis = async () => {
-    if (!currentAnalysis) {
-      toast.warning('Run analysis first');
-      return;
-    }
-
-    // Use the stored analysis to run segmentation
-    setIsSamProcessing(true);
-    toast.info('🎯 Applying AI analysis with SAM 2...');
-
-    try {
-      const overlayCanvas = overlayCanvasRef.current;
-      const baseCanvas = canvasRef.current;
-      if (!overlayCanvas || !baseCanvas) return;
-
-      const { features: gptFeatures, colorProfiles: gptColorProfiles } = currentAnalysis;
-
-      // Get SAM masks
-      const response = await fetch('/api/sam-annotate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData, className: 'all' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('SAM segmentation failed');
-      }
-
-      const data = await response.json();
-      const individualMasks = data.allMasks || [];
-
-      if (individualMasks.length === 0) {
-        toast.warning('SAM 2 found no regions');
-        return;
-      }
-
-      const baseCtx = baseCanvas.getContext('2d')!;
-      const originalImageData = baseCtx.getImageData(0, 0, baseCanvas.width, baseCanvas.height);
-      const ctx = overlayCanvas.getContext('2d')!;
-
-      // Get existing painted pixels
-      const existingData = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
-      const paintedPixels = new Set<number>();
-      for (let i = 0; i < existingData.data.length; i += 4) {
-        if (existingData.data[i + 3] > 0) {
-          paintedPixels.add(i / 4);
-        }
-      }
-
-      // Helper functions (using the existing ones from the component)
-      const findGptMatch = (maskCenterX: number, maskCenterY: number): string | null => {
-        if (gptFeatures.length === 0) return null;
-        const normX = (maskCenterX / overlayCanvas.width) * 100;
-        const normY = (maskCenterY / overlayCanvas.height) * 100;
-        for (const feature of gptFeatures) {
-          const distance = Math.sqrt(
-            Math.pow(normX - feature.centerX, 2) + Math.pow(normY - feature.centerY, 2)
-          );
-          if (distance < feature.radius + 10) return feature.class;
-        }
-        return null;
-      };
-
-      const getMaskCenter = (maskData: ImageData): { x: number; y: number } => {
-        let sumX = 0, sumY = 0, count = 0;
-        const width = maskData.width;
-        for (let i = 0; i < maskData.data.length; i += 4) {
-          if (maskData.data[i] > 128) {
-            const pixelIndex = i / 4;
-            sumX += pixelIndex % width;
-            sumY += Math.floor(pixelIndex / width);
-            count++;
-          }
-        }
-        return count > 0 ? { x: sumX / count, y: sumY / count } : { x: 0, y: 0 };
-      };
-
-      const classifiedMasks: { maskUrl: string; className: string; priority: number }[] = [];
-
-      for (const maskUrl of individualMasks) {
-        if (!maskUrl) continue;
-        try {
-          const maskImg = await loadImage(maskUrl);
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = overlayCanvas.width;
-          tempCanvas.height = overlayCanvas.height;
-          const tempCtx = tempCanvas.getContext('2d')!;
-          tempCtx.drawImage(maskImg, 0, 0, overlayCanvas.width, overlayCanvas.height);
-
-          const maskData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-          const colors = analyzeColorsInMask(originalImageData, maskData);
-          const maskCenter = getMaskCenter(maskData);
-          const gptClass = findGptMatch(maskCenter.x, maskCenter.y);
-
-          let className: string;
-          if (gptClass && isColorCompatible(colors, gptClass)) {
-            className = gptClass;
-          } else {
-            className = classifyWithCustomProfiles(colors, gptColorProfiles);
-          }
-
-          classifiedMasks.push({ maskUrl, className, priority: getClassPriority(className) });
-        } catch (e) {
-          console.warn('Failed to process mask:', e);
-        }
-      }
-
-      classifiedMasks.sort((a, b) => a.priority - b.priority);
-
-      const counts: { [key: string]: number } = {};
-      for (const { maskUrl, className } of classifiedMasks) {
-        if (className === 'Background') continue;
-        const classInfo = ANNOTATION_CLASSES.find(c => c.name === className);
-        if (!classInfo) continue;
-
-        const maskImg = await loadImage(maskUrl);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = overlayCanvas.width;
-        tempCanvas.height = overlayCanvas.height;
-        const tempCtx = tempCanvas.getContext('2d')!;
-        tempCtx.drawImage(maskImg, 0, 0, overlayCanvas.width, overlayCanvas.height);
-
-        const maskData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const currentData = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
-        const pixels = currentData.data;
-        const classColor = hexToRgb(classInfo.color);
-
-        let applied = false;
-        for (let j = 0; j < maskData.data.length; j += 4) {
-          const pixelIndex = j / 4;
-          if ((maskData.data[j] > 128 || maskData.data[j + 1] > 128 || maskData.data[j + 2] > 128) && !paintedPixels.has(pixelIndex)) {
-            pixels[j] = classColor.r;
-            pixels[j + 1] = classColor.g;
-            pixels[j + 2] = classColor.b;
-            pixels[j + 3] = 255;
-            paintedPixels.add(pixelIndex);
-            applied = true;
-          }
-        }
-
-        if (applied) {
-          ctx.putImageData(currentData, 0, 0);
-          counts[className] = (counts[className] || 0) + 1;
-        }
-      }
-
-      saveToHistory();
-      const summary = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ');
-
-      setAiMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ **Applied!** Found: ${summary || 'no features'}`,
-        timestamp: new Date(),
-      }]);
-
-      toast.success(`Applied: ${summary || 'no features'}`);
-
-    } catch (error: any) {
-      toast.error(`Failed: ${error.message}`);
-    } finally {
-      setIsSamProcessing(false);
-    }
-  };
-
-  // Smart Segment All - uses GPT-4 Vision + SAM for accurate classification
+  // Smart Segment All - uses SAM 2 with color-based classification
   const handleSmartSegmentAll = async () => {
     const overlayCanvas = overlayCanvasRef.current;
     const baseCanvas = canvasRef.current;
     if (!overlayCanvas || !baseCanvas) return;
 
     setIsSamProcessing(true);
-    setShowAiPanel(true); // Open the AI panel to show reasoning
-    toast.info('🧠 GPT-4 Vision analyzing golf course layout...');
-
-    // Add initial message
-    setAiMessages(prev => [...prev, {
-      role: 'assistant',
-      content: '🔍 **Analyzing image...**\n\nScanning for golf course features...',
-      timestamp: new Date(),
-    }]);
+    toast.info('🎯 SAM 2 analyzing image...');
 
     try {
-      // Step 1: Get GPT-4 Vision to identify feature locations AND color profiles for this specific image
-      let gptFeatures: { class: string; centerX: number; centerY: number; radius: number }[] = [];
-      let gptColorProfiles: { [key: string]: {
-        minR: number; maxR: number;
-        minG: number; maxG: number;
-        minB: number; maxB: number;
-        minBrightness: number; maxBrightness: number;
-      }} = {};
-
-      try {
-        const gptResponse = await fetch('/api/gpt-classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageData }),
-        });
-
-        if (gptResponse.ok) {
-          const gptData = await gptResponse.json();
-          gptFeatures = gptData.features || [];
-          gptColorProfiles = gptData.colorProfiles || {};
-
-          // Store analysis for potential reuse
-          setCurrentAnalysis({ features: gptFeatures, colorProfiles: gptColorProfiles });
-
-          // Build analysis message
-          const featureCounts: { [key: string]: number } = {};
-          gptFeatures.forEach((f) => {
-            featureCounts[f.class] = (featureCounts[f.class] || 0) + 1;
-          });
-
-          const featureSummary = Object.entries(featureCounts)
-            .map(([cls, count]) => `${count} ${cls}${count > 1 ? 's' : ''}`)
-            .join(', ') || 'No specific features';
-
-          const colorClasses = Object.keys(gptColorProfiles);
-
-          // Build detailed color profile description
-          const colorDetails = colorClasses.map(cls => {
-            const cp = gptColorProfiles[cls];
-            return `**${cls}:**\n  R: ${cp.minR}-${cp.maxR} | G: ${cp.minG}-${cp.maxG} | B: ${cp.minB}-${cp.maxB}\n  Brightness: ${cp.minBrightness}-${cp.maxBrightness}`;
-          }).join('\n\n');
-
-          // Add GPT analysis message to chat
-          setAiMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `**GPT-4 Analysis Complete**\n\n**Feature Locations:** ${featureSummary}\n\n**Color Profiles (RGB ranges for this image):**\n\n${colorDetails || 'No color profiles detected'}\n\n⏳ Running SAM 2 segmentation with these colors...`,
-            timestamp: new Date(),
-            features: gptFeatures,
-            colorProfiles: gptColorProfiles,
-          }]);
-
-          toast.info(`🎯 GPT-4: ${gptFeatures.length} features, ${colorClasses.length} color profiles. Running SAM 2...`);
-          console.log('GPT-4 color profiles for this image:', gptColorProfiles);
-        }
-      } catch (e) {
-        console.warn('GPT-4 Vision failed, falling back to global colors:', e);
-        setAiMessages(prev => [...prev, {
-          role: 'assistant',
-          content: '⚠️ GPT-4 analysis failed, using default color detection...',
-          timestamp: new Date(),
-        }]);
-      }
-
-      // Step 2: Get SAM masks
+      // Get SAM masks
       const response = await fetch('/api/sam-annotate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -746,51 +409,14 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
       const existingData = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
       const paintedPixels = new Set<number>();
 
-      // Mark already painted pixels (check alpha OR any RGB value)
+      // Mark already painted pixels
       for (let i = 0; i < existingData.data.length; i += 4) {
         if (existingData.data[i + 3] > 0 || existingData.data[i] > 0 || existingData.data[i + 1] > 0 || existingData.data[i + 2] > 0) {
           paintedPixels.add(i / 4);
         }
       }
 
-      // Helper: Check if mask center is near a GPT-identified feature
-      const findGptMatch = (maskCenterX: number, maskCenterY: number): string | null => {
-        if (gptFeatures.length === 0) return null;
-
-        // Normalize coordinates to 0-100 range
-        const normX = (maskCenterX / overlayCanvas.width) * 100;
-        const normY = (maskCenterY / overlayCanvas.height) * 100;
-
-        for (const feature of gptFeatures) {
-          const distance = Math.sqrt(
-            Math.pow(normX - feature.centerX, 2) + Math.pow(normY - feature.centerY, 2)
-          );
-          // If mask center is within the feature's radius, it's a match
-          if (distance < feature.radius + 10) {
-            return feature.class;
-          }
-        }
-        return null;
-      };
-
-      // Helper: Calculate mask center
-      const getMaskCenter = (maskData: ImageData): { x: number; y: number } => {
-        let sumX = 0, sumY = 0, count = 0;
-        const width = maskData.width;
-        for (let i = 0; i < maskData.data.length; i += 4) {
-          if (maskData.data[i] > 128) {
-            const pixelIndex = i / 4;
-            const x = pixelIndex % width;
-            const y = Math.floor(pixelIndex / width);
-            sumX += x;
-            sumY += y;
-            count++;
-          }
-        }
-        return count > 0 ? { x: sumX / count, y: sumY / count } : { x: 0, y: 0 };
-      };
-
-      // Classify each mask using GPT context + color
+      // Classify each mask using color analysis
       const classifiedMasks: { maskUrl: string; className: string; priority: number }[] = [];
 
       for (let i = 0; i < individualMasks.length; i++) {
@@ -809,19 +435,8 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
           const maskData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
           const colors = analyzeColorsInMask(originalImageData, maskData);
 
-          // First try GPT-4's spatial identification
-          const maskCenter = getMaskCenter(maskData);
-          const gptClass = findGptMatch(maskCenter.x, maskCenter.y);
-
-          // Use GPT class if available and the color is compatible, otherwise fall back to color
-          let className: string;
-          if (gptClass && isColorCompatible(colors, gptClass)) {
-            className = gptClass;
-          } else {
-            // Use GPT's custom color profiles if available, otherwise use global classification
-            className = classifyWithCustomProfiles(colors, gptColorProfiles);
-          }
-
+          // Classify based on color
+          const className = classifyByColor(colors);
           const priority = getClassPriority(className);
           classifiedMasks.push({ maskUrl, className, priority });
         } catch (e) {
@@ -863,7 +478,7 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
             pixels[j + 1] = classColor.g;
             pixels[j + 2] = classColor.b;
             pixels[j + 3] = 255;
-            paintedPixels.add(pixelIndex); // Mark as painted
+            paintedPixels.add(pixelIndex);
             applied = true;
           }
         }
@@ -875,26 +490,12 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
       }
 
       saveToHistory();
-
       const summary = Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ');
-
-      // Add completion message to chat
-      setAiMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ **Segmentation Complete!**\n\nApplied regions:\n${summary ? summary.split(', ').map(s => `• ${s}`).join('\n') : '• No golf features found'}\n\nUse the brush tool to refine, or provide feedback to re-analyze.`,
-        timestamp: new Date(),
-      }]);
-
-      toast.success(`✨ Smart segmentation complete! Found: ${summary || 'no golf features'}. Use brush to refine.`);
+      toast.success(`✨ Segmentation complete! Found: ${summary || 'no golf features'}. Use brush to refine.`);
 
     } catch (error: any) {
-      console.error('Smart segment error:', error);
-      setAiMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ **Segmentation Failed**\n\n${error.message}\n\nTry again or use manual annotation.`,
-        timestamp: new Date(),
-      }]);
-      toast.error(`Smart segmentation failed: ${error.message}`);
+      console.error('Segment error:', error);
+      toast.error(`Segmentation failed: ${error.message}`);
     } finally {
       setIsSamProcessing(false);
     }
@@ -1070,111 +671,6 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
       avgB: count > 0 ? totalB / count : 0,
       pixelCount: count
     };
-  };
-
-  // Helper: Classify using GPT's custom color profiles for this specific image
-  const classifyWithCustomProfiles = (
-    colors: { avgR: number; avgG: number; avgB: number; pixelCount: number },
-    colorProfiles: { [key: string]: {
-      minR: number; maxR: number;
-      minG: number; maxG: number;
-      minB: number; maxB: number;
-      minBrightness: number; maxBrightness: number;
-    }}
-  ): string => {
-    const { avgR, avgG, avgB, pixelCount } = colors;
-
-    // If no custom profiles, fall back to global classification
-    if (Object.keys(colorProfiles).length === 0) {
-      return classifyByColor(colors);
-    }
-
-    // Skip very small regions
-    if (pixelCount < 200) return 'Background';
-
-    const brightness = (avgR + avgG + avgB) / 3;
-
-    // Score each class based on how well the color fits GPT's profile
-    const scores: { [key: string]: number } = {};
-    const validClasses = ['Water', 'Bunker', 'Green', 'Tee', 'Fairway'];
-
-    for (const cls of validClasses) {
-      const profile = colorProfiles[cls];
-      if (!profile) {
-        scores[cls] = 0;
-        continue;
-      }
-
-      let score = 0;
-
-      // Check if RGB values are within the profile's range (with some tolerance)
-      const tolerance = 25; // Allow some flexibility
-
-      const rInRange = avgR >= profile.minR - tolerance && avgR <= profile.maxR + tolerance;
-      const gInRange = avgG >= profile.minG - tolerance && avgG <= profile.maxG + tolerance;
-      const bInRange = avgB >= profile.minB - tolerance && avgB <= profile.maxB + tolerance;
-      const brightInRange = brightness >= profile.minBrightness - tolerance && brightness <= profile.maxBrightness + tolerance;
-
-      // Base score for being in range
-      if (rInRange) score += 20;
-      if (gInRange) score += 20;
-      if (bInRange) score += 20;
-      if (brightInRange) score += 20;
-
-      // Bonus for being close to the middle of the range
-      const midR = (profile.minR + profile.maxR) / 2;
-      const midG = (profile.minG + profile.maxG) / 2;
-      const midB = (profile.minB + profile.maxB) / 2;
-
-      const distFromMid = Math.sqrt(
-        Math.pow(avgR - midR, 2) + Math.pow(avgG - midG, 2) + Math.pow(avgB - midB, 2)
-      );
-
-      // Closer to middle = higher score (max 30 bonus)
-      score += Math.max(0, 30 - distFromMid / 3);
-
-      // Size adjustments based on class
-      if (cls === 'Green' && pixelCount < 5000) score += 15;
-      if (cls === 'Tee' && pixelCount < 2000) score += 20;
-      if (cls === 'Fairway' && pixelCount > 5000) score += 15;
-
-      // CRITICAL: Prevent trees from being classified as water
-      // Trees are dark GREEN dominant, Water is BLUE dominant
-      if (cls === 'Water') {
-        // If green is dominant over blue, it's likely trees, NOT water
-        if (avgG > avgB + 10) {
-          score -= 60; // Heavy penalty - this is probably trees
-        }
-        // Water MUST have blue as dominant or near-dominant
-        if (avgB < avgG && avgB < avgR) {
-          score -= 40; // Blue should be significant for water
-        }
-        // Very dark green = trees, not water
-        if (avgG > avgR && avgG > avgB && brightness < 80) {
-          score -= 50; // Dark green = trees
-        }
-      }
-
-      scores[cls] = score;
-    }
-
-    // Find best match
-    let bestClass = 'Background';
-    let bestScore = 40; // Minimum threshold
-
-    for (const [cls, score] of Object.entries(scores)) {
-      if (score > bestScore) {
-        bestScore = score;
-        bestClass = cls;
-      }
-    }
-
-    // If no good match from custom profiles, fall back to global classification
-    if (bestClass === 'Background') {
-      return classifyByColor(colors);
-    }
-
-    return bestClass;
   };
 
   // Helper: Classify region by average color with target class focus (global fallback)
@@ -1384,142 +880,6 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
     const annotationData = compositeCanvas.toDataURL('image/png');
     onSave(annotationData);
     toast.success('Annotation saved! Unannotated areas = Background');
-  };
-
-  // AI Agent annotation
-  const handleAiAnnotate = async () => {
-    setIsAiLoading(true);
-    toast.info('🤖 AI Agent analyzing the course (GPT-4 Vision + SAM 2)...');
-
-    try {
-      const response = await fetch('/api/ai-annotate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ imageData }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to get AI annotation');
-      }
-
-      const data = await response.json();
-      const regions = data.regions || [];
-      const usedSAM = data.usedSAM;
-      const combinedMask = data.combinedMask;
-
-      if (regions.length === 0) {
-        toast.warning('AI could not identify any golf course features in this image.');
-        return;
-      }
-
-      // Draw the AI-generated regions on the canvas
-      const overlayCanvas = overlayCanvasRef.current;
-      if (!overlayCanvas) return;
-
-      const ctx = overlayCanvas.getContext('2d');
-      if (!ctx) return;
-
-      // Clear existing annotations
-      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-      // Map class names to our annotation classes
-      const classMap: { [key: string]: typeof ANNOTATION_CLASSES[0] } = {
-        'fairway': ANNOTATION_CLASSES[1],
-        'green': ANNOTATION_CLASSES[2],
-        'tee': ANNOTATION_CLASSES[3],
-        'bunker': ANNOTATION_CLASSES[4],
-        'water': ANNOTATION_CLASSES[5],
-      };
-
-      // If SAM was used and we have a combined mask, draw it
-      if (usedSAM && combinedMask) {
-        toast.info('🎯 SAM 2 generated precise masks, applying...');
-
-        // Load the SAM mask image
-        const maskImg = new Image();
-        maskImg.crossOrigin = 'anonymous';
-
-        await new Promise<void>((resolve, reject) => {
-          maskImg.onload = () => {
-            // Draw the mask - SAM returns a binary mask
-            // We need to colorize it based on feature classes
-            ctx.drawImage(maskImg, 0, 0, overlayCanvas.width, overlayCanvas.height);
-            resolve();
-          };
-          maskImg.onerror = () => reject(new Error('Failed to load SAM mask'));
-          maskImg.src = combinedMask;
-        });
-
-        // Also draw colored circles at each feature point to show classifications
-        regions.forEach((region: any) => {
-          const classInfo = classMap[region.class.toLowerCase()];
-          if (!classInfo || !region.point) return;
-
-          const x = (region.point.x / 100) * overlayCanvas.width;
-          const y = (region.point.y / 100) * overlayCanvas.height;
-
-          // Draw a colored dot at the feature point
-          ctx.fillStyle = classInfo.color;
-          ctx.globalAlpha = 0.9;
-          ctx.beginPath();
-          ctx.arc(x, y, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          ctx.globalAlpha = 1.0;
-        });
-
-      } else {
-        // Fallback: Draw polygons or points without SAM
-        regions.forEach((region: any) => {
-          const classInfo = classMap[region.class.toLowerCase()];
-          if (!classInfo) return;
-
-          ctx.fillStyle = classInfo.color;
-          ctx.globalAlpha = 0.6;
-
-          if (region.polygon && region.polygon.length > 0) {
-            // Draw polygon
-            ctx.beginPath();
-            region.polygon.forEach((point: number[], index: number) => {
-              const x = (point[0] / 100) * overlayCanvas.width;
-              const y = (point[1] / 100) * overlayCanvas.height;
-              if (index === 0) {
-                ctx.moveTo(x, y);
-              } else {
-                ctx.lineTo(x, y);
-              }
-            });
-            ctx.closePath();
-            ctx.fill();
-          } else if (region.point) {
-            // Draw a circle at the point
-            const x = (region.point.x / 100) * overlayCanvas.width;
-            const y = (region.point.y / 100) * overlayCanvas.height;
-            ctx.beginPath();
-            ctx.arc(x, y, 20, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.globalAlpha = 1.0;
-        });
-      }
-
-      // Save to history
-      saveToHistory();
-
-      const method = usedSAM ? 'GPT-4 Vision + SAM 2' : 'GPT-4 Vision';
-      toast.success(`✨ AI annotation complete using ${method}! Found ${regions.length} features. You can refine manually.`);
-
-    } catch (error: any) {
-      console.error('AI annotation error:', error);
-      toast.error(`Failed to generate AI annotation: ${error.message}`);
-    } finally {
-      setIsAiLoading(false);
-    }
   };
 
   // Mouse wheel zoom listener
@@ -1971,187 +1331,6 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
           )}
         </div>
 
-        {/* AI Assistant Panel */}
-        <div className={`${showAiPanel ? 'w-80' : 'w-0'} transition-all duration-300 bg-slate-900 border-l border-slate-700 flex flex-col overflow-hidden`}>
-          {showAiPanel && (
-            <>
-              {/* Panel Header */}
-              <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bot className="size-5 text-purple-400" />
-                  <span className="text-white font-medium">AI Assistant</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAiPanel(false)}
-                  className="h-8 w-8 p-0 text-slate-400 hover:text-white"
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-
-              {/* Chat Messages */}
-              <div
-                ref={chatScrollRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4"
-              >
-                {aiMessages.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Bot className="size-12 mx-auto mb-3 text-slate-600" />
-                    <p className="text-slate-400 text-sm">Click "Analyze" to get AI suggestions</p>
-                    <p className="text-slate-500 text-xs mt-1">GPT-4 will analyze the image and suggest color profiles</p>
-                  </div>
-                ) : (
-                  aiMessages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[90%] rounded-lg p-3 ${
-                          msg.role === 'user'
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-800 text-slate-200'
-                        }`}
-                      >
-                        {msg.role === 'assistant' && (
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <Bot className="size-3.5 text-purple-400" />
-                            <span className="text-xs text-purple-400 font-medium">GPT-4</span>
-                          </div>
-                        )}
-                        <div className="text-sm whitespace-pre-wrap">
-                          {msg.content.split('\n').map((line, i) => {
-                            if (line.startsWith('**') && line.endsWith('**')) {
-                              return <p key={i} className="font-semibold text-white">{line.replace(/\*\*/g, '')}</p>;
-                            }
-                            return <p key={i}>{line}</p>;
-                          })}
-                        </div>
-                        {/* Show detected features as color pills */}
-                        {msg.colorProfiles && Object.keys(msg.colorProfiles).length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-slate-700">
-                            <p className="text-xs text-slate-400 mb-2">Detected classes:</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {Object.keys(msg.colorProfiles).map((cls) => {
-                                const classInfo = ANNOTATION_CLASSES.find(c => c.name === cls);
-                                return (
-                                  <span
-                                    key={cls}
-                                    className="px-2 py-1 rounded text-xs font-medium"
-                                    style={{
-                                      backgroundColor: classInfo?.color || '#666',
-                                      color: cls === 'Bunker' ? '#000' : '#fff',
-                                    }}
-                                  >
-                                    {cls}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        <div className="text-[10px] text-slate-500 mt-2">
-                          {msg.timestamp.toLocaleTimeString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {isAnalyzing && (
-                  <div className="flex justify-start">
-                    <div className="bg-slate-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="size-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-slate-300 text-sm">Analyzing image...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="p-4 border-t border-slate-700 space-y-3">
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleAiAnalyze()}
-                    disabled={isAnalyzing || isSamProcessing}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="size-4 mr-2" />
-                        Analyze
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={handleApplyAnalysis}
-                    disabled={!currentAnalysis || isSamProcessing || isAnalyzing}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
-                  >
-                    {isSamProcessing ? (
-                      <>
-                        <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Applying...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="size-4 mr-2" />
-                        Apply
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Feedback Input */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={userFeedback}
-                    onChange={(e) => setUserFeedback(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && userFeedback.trim()) {
-                        handleAiAnalyze(userFeedback);
-                      }
-                    }}
-                    placeholder="Give feedback to refine..."
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
-                  />
-                  <Button
-                    onClick={() => userFeedback.trim() && handleAiAnalyze(userFeedback)}
-                    disabled={!userFeedback.trim() || isAnalyzing}
-                    className="px-3 bg-slate-700 hover:bg-slate-600"
-                  >
-                    <Send className="size-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-500 text-center">
-                  e.g., "focus more on fairways" or "ignore the trees"
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Toggle AI Panel Button (when collapsed) */}
-        {!showAiPanel && (
-          <Button
-            onClick={() => setShowAiPanel(true)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-purple-600 hover:bg-purple-700 h-24 w-8 rounded-l-lg rounded-r-none flex items-center justify-center"
-          >
-            <div className="flex flex-col items-center gap-1">
-              <MessageSquare className="size-4" />
-              <ChevronLeft className="size-3" />
-            </div>
-          </Button>
-        )}
       </div>
 
       {/* Status Bar */}
