@@ -22,12 +22,15 @@ interface MapAreaProps {
 const CAPTURE_BOX_WIDTH = 1664;
 const CAPTURE_BOX_HEIGHT = 1024;
 
+// Segmentation API URL - Hugging Face Spaces
+const SEGMENTATION_API_URL = process.env.NEXT_PUBLIC_SEGMENTATION_API_URL || 'https://elo0oo0-golf-segmentation-api.hf.space';
+
 // Real segmentation function - calls FastAPI backend
 async function performSegmentation(imageBlob: Blob): Promise<SegmentationResult> {
   const formData = new FormData();
   formData.append('file', imageBlob, 'map_capture.jpg');
 
-  const response = await fetch('http://localhost:8000/segment', {
+  const response = await fetch(`${SEGMENTATION_API_URL}/segment`, {
     method: 'POST',
     body: formData,
   });
