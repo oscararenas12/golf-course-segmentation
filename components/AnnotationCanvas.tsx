@@ -1016,7 +1016,7 @@ export function AnnotationCanvas({ imageData, initialAnnotation, onSave, onClose
               )}
             </Button>
             <p className="text-slate-400 text-xs mt-2 text-center">
-              GPT-4 + SAM 2 segments all features with smart priority
+              SAM 2 segments all features with color-based classification
             </p>
 
             {/* Segment Everything button */}
