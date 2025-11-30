@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
-import { SegmentationResult } from '../app/page';
+import { SegmentationResult } from '@/types/segmentation';
 import { DatasetEntry } from '../types/dataset';
 import { saveToDataset, updateEntry, getDatasetAsync, clearDataset, calculateDatasetSizeSync, formatBytes } from '../utils/datasetStorage';
 import { toast } from 'sonner';

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
-import { SegmentationResult } from '../app/page';
+import { SegmentationResult } from '@/types/segmentation';
 import { toast } from 'sonner';
 import { Lightbulb } from 'lucide-react';
 import html2canvas from 'html2canvas';

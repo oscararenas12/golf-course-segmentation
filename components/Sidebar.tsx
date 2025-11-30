@@ -9,7 +9,7 @@ import { Legend } from './Legend';
 import { Statistics } from './Statistics';
 import { DatasetCapture } from './DatasetCapture';
 import { ClassificationCapture } from './ClassificationCapture';
-import { SegmentationResult } from '../app/page';
+import { SegmentationResult } from '@/types/segmentation';
 import { Separator } from './ui/separator';
 
 type WorkflowMode = 'dataset' | 'segmentation';

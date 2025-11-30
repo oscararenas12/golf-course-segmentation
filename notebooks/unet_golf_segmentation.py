@@ -17,9 +17,6 @@ import os
 import numpy as np
 import pandas as pd
 
-import pytorch_lightning as pl
-from pytorch_lightning.strategies.ddp import DDPStrategy
-
 import torch
 import torchmetrics
 from torch import nn
@@ -341,3 +338,4 @@ for idx in range(1, 8): #Show some of the batches
     axes[0].imshow(orthophoto)
     axes[1].imshow(groundtruth)
     axes[2].imshow(prediction)
+# %%
