@@ -21,7 +21,7 @@ const hashPassword = (password: string): string => {
 };
 
 // The hashed password - change this by running: hashPassword('your-password')
-// Current password: "golfcourse2024"
+// Current password: "golfcourse2025"
 const VALID_PASSWORD_HASH = '-1544aborrar42';
 
 export function PasswordGate({ children }: PasswordGateProps) {
@@ -47,7 +47,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
 
     // Simple password check
     setTimeout(() => {
-      if (password === 'golfcourse2024') {
+      if (password === 'golfcourse2025') {
         localStorage.setItem('golf-seg-auth', 'authenticated');
         setIsAuthenticated(true);
       } else {

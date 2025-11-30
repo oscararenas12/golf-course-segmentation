@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Camera, Check, X, Package, Trash2, Download } from 'lucide-react';
 import { Button } from './ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 
 interface ClassificationEntry {
@@ -82,6 +83,7 @@ export function ClassificationCapture({
   const [golfCount, setGolfCount] = useState(0);
   const [notGolfCount, setNotGolfCount] = useState(0);
   const [isLabeling, setIsLabeling] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Load dataset counts
   useEffect(() => {
@@ -138,13 +140,16 @@ export function ClassificationCapture({
     }
   };
 
-  const handleClear = async () => {
-    if (window.confirm('Clear all classification data? This cannot be undone.')) {
-      await clearClassificationDataset();
-      setGolfCount(0);
-      setNotGolfCount(0);
-      toast.success('Classification dataset cleared');
-    }
+  const handleClearClick = () => {
+    setShowClearConfirm(true);
+  };
+
+  const handleConfirmClear = async () => {
+    await clearClassificationDataset();
+    setGolfCount(0);
+    setNotGolfCount(0);
+    setShowClearConfirm(false);
+    toast.success('Classification dataset cleared');
   };
 
   const handleExport = async () => {
@@ -312,23 +317,49 @@ export function ClassificationCapture({
         <Button
           onClick={handleExport}
           disabled={totalCount === 0}
-          variant="outline"
-          className="w-full border-slate-600 text-black hover:bg-slate-700"
+          className="w-full bg-slate-600 text-white hover:bg-slate-500 disabled:bg-slate-700 disabled:text-slate-500"
         >
           <Download className="size-4 mr-2" />
           Export Dataset
         </Button>
 
         <Button
-          onClick={handleClear}
+          onClick={handleClearClick}
           disabled={totalCount === 0}
-          variant="outline"
-          className="w-full border-slate-600 text-black hover:bg-slate-700 hover:text-red-400"
+          className="w-full bg-slate-600 text-white hover:bg-red-700 disabled:bg-slate-700 disabled:text-slate-500"
         >
           <Trash2 className="size-4 mr-2" />
           Clear Dataset
         </Button>
       </div>
+
+      {/* Clear Dataset Confirmation Dialog */}
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-slate-200">
+          <DialogHeader>
+            <DialogTitle>Clear Dataset?</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Are you sure you want to clear all {totalCount} labeled images? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowClearConfirm(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmClear}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="size-4 mr-2" />
+              Clear All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -117,97 +117,95 @@ export function DatasetViewer({ onEditAnnotation, onDatasetChange, refreshTrigge
     <div className="space-y-3">
       <h4 className="text-slate-300 text-sm font-medium">Saved Entries ({dataset.length})</h4>
 
-      <ScrollArea className="h-[300px] w-full">
-        <div className="space-y-2 pr-3 pl-1">
-          {dataset.map((entry) => (
-            <div
-              key={entry.id}
-              className="bg-slate-700/30 rounded-lg p-2.5 border border-slate-600/30 hover:border-slate-500/50 transition-colors"
-            >
-              {/* Top section with thumbnail and info */}
-              <div className="flex items-start gap-2.5">
-                {/* Thumbnail */}
-                {entry.images.satellite && (
-                  <div className="size-14 rounded overflow-hidden flex-shrink-0 bg-slate-800">
-                    <img
-                      src={entry.images.satellite}
-                      alt={entry.courseName}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
+      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+        {dataset.map((entry) => (
+          <div
+            key={entry.id}
+            className="bg-slate-700/30 rounded-lg p-2.5 border border-slate-600/30 hover:border-slate-500/50 transition-colors"
+          >
+            {/* Top section with thumbnail and info */}
+            <div className="flex items-start gap-2.5">
+              {/* Thumbnail */}
+              {entry.images.satellite && (
+                <div className="w-14 h-14 rounded overflow-hidden flex-shrink-0 bg-slate-800">
+                  <img
+                    src={entry.images.satellite}
+                    alt={entry.courseName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <h5 className="text-slate-200 font-medium text-xs truncate">
-                    {entry.courseName}
-                  </h5>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h5 className="text-slate-200 font-medium text-xs truncate">
+                  {entry.courseName}
+                </h5>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                    <Calendar className="size-2.5" />
-                    <span className="truncate">{new Date(entry.timestamp).toLocaleDateString()}</span>
-                  </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                  <Calendar className="size-2.5 flex-shrink-0" />
+                  <span className="truncate">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                    <MapPin className="size-2.5" />
-                    <span className="truncate">
-                      {entry.location.lat.toFixed(2)}, {entry.location.lng.toFixed(2)}
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                  <MapPin className="size-2.5 flex-shrink-0" />
+                  <span className="truncate">
+                    {entry.location.lat.toFixed(2)}, {entry.location.lng.toFixed(2)}
+                  </span>
+                </div>
+
+                {/* Annotations indicator */}
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {entry.images.groundTruth && (
+                    <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[9px] rounded">
+                      Annotated
                     </span>
-                  </div>
-
-                  {/* Annotations indicator */}
-                  <div className="flex gap-1 mt-1 flex-wrap">
-                    {entry.images.groundTruth && (
-                      <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[9px] rounded">
-                        Annotated
-                      </span>
-                    )}
-                    {entry.images.mask && (
-                      <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded">
-                        Predicted
-                      </span>
-                    )}
-                  </div>
+                  )}
+                  {entry.images.mask && (
+                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded">
+                      Predicted
+                    </span>
+                  )}
                 </div>
               </div>
-
-              {/* Actions at bottom */}
-              <div className="flex gap-1.5 mt-2.5">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleViewEntry(entry)}
-                  className="flex-1 h-7 text-[11px] border-slate-600 text-black hover:bg-slate-700"
-                >
-                  <Eye className="size-3 mr-1" />
-                  View
-                </Button>
-
-                {entry.images.satellite && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onEditAnnotation(entry)}
-                    className="flex-1 h-7 text-[11px] border-slate-600 text-black hover:bg-slate-700"
-                  >
-                    <Pencil className="size-3 mr-1" />
-                    Edit
-                  </Button>
-                )}
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDeleteClick(entry)}
-                  className="h-7 w-7 p-0 border-slate-600 text-black hover:bg-red-900 hover:text-red-400"
-                >
-                  <Trash2 className="size-3" />
-                </Button>
-              </div>
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+
+            {/* Actions at bottom */}
+            <div className="flex gap-1.5 mt-2.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleViewEntry(entry)}
+                className="flex-1 h-7 text-[11px] border-slate-600 bg-slate-600 text-white hover:bg-slate-500"
+              >
+                <Eye className="size-3 mr-1" />
+                View
+              </Button>
+
+              {entry.images.satellite && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onEditAnnotation(entry)}
+                  className="flex-1 h-7 text-[11px] border-slate-600 bg-slate-600 text-white hover:bg-slate-500"
+                >
+                  <Pencil className="size-3 mr-1" />
+                  Edit
+                </Button>
+              )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDeleteClick(entry)}
+                className="h-7 w-7 p-0 border-slate-600 bg-slate-600 text-white hover:bg-red-700"
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>

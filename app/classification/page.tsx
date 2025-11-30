@@ -45,7 +45,7 @@ export default function ClassificationPage() {
           <div className="p-6 space-y-6">
             {/* Back Link */}
             <Link href="/">
-              <Button variant="ghost" className="text-slate-400 hover:text-slate-200 -ml-2">
+              <Button className="bg-slate-600 text-white hover:bg-slate-500 -ml-2">
                 <ArrowLeft className="size-4 mr-2" />
                 Back to Home
               </Button>

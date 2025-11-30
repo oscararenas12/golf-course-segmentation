@@ -53,7 +53,7 @@ export default function SegmentationPage() {
           <div className="p-6 space-y-6">
             {/* Back Link */}
             <Link href="/">
-              <Button variant="ghost" className="text-slate-400 hover:text-slate-200 -ml-2">
+              <Button className="bg-slate-600 text-white hover:bg-slate-500 -ml-2">
                 <ArrowLeft className="size-4 mr-2" />
                 Back to Home
               </Button>
@@ -124,8 +124,7 @@ export default function SegmentationPage() {
               {segmentationResult && (
                 <Button
                   onClick={handleClearResults}
-                  variant="outline"
-                  className="w-full border-slate-600 text-slate-300 hover:bg-slate-700"
+                  className="w-full bg-slate-600 text-white hover:bg-slate-500"
                 >
                   Clear Results
                 </Button>

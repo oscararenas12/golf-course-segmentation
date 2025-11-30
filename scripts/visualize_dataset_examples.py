@@ -75,6 +75,74 @@ EASY_CLASSES = {
 }
 
 # ============================================================
+# FIGURE 0: DANISH GOLF WITH SEGMENTATION (3 Random Examples)
+# ============================================================
+def plot_danish_golf_with_segmentation(num_examples=3, save_name="fig0_danish_golf_segmentation.png"):
+    """Plot 3 random Danish golf courses with their segmentation masks."""
+    print(f"\nGenerating: {save_name}")
+
+    import random
+
+    # Masks directory
+    MASKS_DIR = os.path.join(golf_dataset_path, '3. class masks')
+
+    # Get list of available images with masks
+    available_files = []
+    for f in os.listdir(IMAGES_DIR):
+        if f.endswith(('.jpg', '.png', '.jpeg')):
+            mask_name = f.replace('.jpg', '.png').replace('.jpeg', '.png')
+            mask_path = os.path.join(MASKS_DIR, mask_name)
+            if os.path.exists(mask_path):
+                available_files.append((os.path.join(IMAGES_DIR, f), mask_path))
+
+    # Pick 3 random samples
+    random.seed(42)  # For reproducibility
+    selected = random.sample(available_files, min(num_examples, len(available_files)))
+
+    # Create figure: 3 rows x 2 cols (image | mask)
+    fig, axes = plt.subplots(num_examples, 2, figsize=(12, 5*num_examples))
+    fig.suptitle('Danish Golf Courses - Satellite Images with Segmentation Masks',
+                 fontsize=14, fontweight='bold', y=1.01)
+
+    # Class colors for legend (matching the dataset)
+    class_info = [
+        ('Background', '#000000'),
+        ('Fairway', '#00FF00'),
+        ('Green', '#006400'),
+        ('Bunker', '#FFD700'),
+        ('Water', '#0000FF'),
+        ('Rough', '#8B4513'),
+    ]
+
+    for i, (img_path, mask_path) in enumerate(selected):
+        # Load image and mask
+        img = Image.open(img_path)
+        mask = Image.open(mask_path)
+
+        # Plot satellite image
+        axes[i, 0].imshow(img)
+        axes[i, 0].set_title(f'Satellite Image {i+1}', fontsize=12, fontweight='bold')
+        axes[i, 0].axis('off')
+
+        # Plot segmentation mask
+        axes[i, 1].imshow(mask)
+        axes[i, 1].set_title(f'Segmentation Mask {i+1}', fontsize=12, fontweight='bold')
+        axes[i, 1].axis('off')
+
+    # Add legend at the bottom
+    from matplotlib.patches import Patch
+    legend_elements = [Patch(facecolor=color, label=name) for name, color in class_info]
+    fig.legend(handles=legend_elements, loc='lower center', ncol=6, fontsize=10,
+               bbox_to_anchor=(0.5, -0.02))
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, save_name), dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    plt.close()
+    print(f"   Saved to {OUTPUT_DIR}/{save_name}")
+
+
+# ============================================================
 # FIGURE 1: DANISH GOLF COURSES (Positive Examples)
 # ============================================================
 def plot_danish_golf_examples(num_examples=12, save_name="fig1_danish_golf_courses.png"):
@@ -530,22 +598,26 @@ if __name__ == "__main__":
     print("GENERATING PAPER FIGURES")
     print("=" * 60)
 
-    # Generate all figures
-    plot_danish_golf_examples(num_examples=12)
-    plot_ucmerced_golf_examples(num_examples=8)
-    plot_challenging_negatives(samples_per_class=3)
-    plot_easy_negatives(samples_per_class=3)
-    plot_golf_vs_challenging()
-    plot_all_ucmerced_classes()
-    plot_augmentation_examples()
-    plot_segmentation_augmentation()
-    save_individual_samples()
+    # Generate Danish golf with segmentation (3 random examples)
+    plot_danish_golf_with_segmentation(num_examples=3)
+
+    # Uncomment below to generate all other figures:
+    # plot_danish_golf_examples(num_examples=12)
+    # plot_ucmerced_golf_examples(num_examples=8)
+    # plot_challenging_negatives(samples_per_class=3)
+    # plot_easy_negatives(samples_per_class=3)
+    # plot_golf_vs_challenging()
+    # plot_all_ucmerced_classes()
+    # plot_augmentation_examples()
+    # plot_segmentation_augmentation()
+    # save_individual_samples()
 
     print("\n" + "=" * 60)
     print("DONE!")
     print("=" * 60)
     print(f"\nAll figures saved to: {OUTPUT_DIR}/")
     print("\nGenerated files:")
+    print("  - fig0_danish_golf_segmentation.png  (Danish golf + segmentation masks)")
     print("  - fig1_danish_golf_courses.png       (Danish golf examples)")
     print("  - fig2_ucmerced_golf_courses.png     (UC Merced golf examples)")
     print("  - fig3_challenging_negatives.png     (Challenging negative classes)")

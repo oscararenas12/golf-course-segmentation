@@ -38,6 +38,7 @@ export function DatasetCapture({
   const [groundTruthAnnotation, setGroundTruthAnnotation] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [showClearDatasetConfirm, setShowClearDatasetConfirm] = useState(false);
   const [datasetRefreshTrigger, setDatasetRefreshTrigger] = useState(0);
   const [datasetSize, setDatasetSize] = useState('0 Bytes');
 
@@ -278,13 +279,16 @@ export function DatasetCapture({
   };
 
 
-  const handleClearDataset = async () => {
-    if (window.confirm('Are you sure you want to clear all saved data? This cannot be undone.')) {
-      await clearDataset();
-      setSavedCount(0);
-      setDatasetRefreshTrigger(prev => prev + 1);
-      toast.success('Dataset cleared');
-    }
+  const handleClearDatasetClick = () => {
+    setShowClearDatasetConfirm(true);
+  };
+
+  const handleConfirmClearDataset = async () => {
+    await clearDataset();
+    setSavedCount(0);
+    setDatasetRefreshTrigger(prev => prev + 1);
+    setShowClearDatasetConfirm(false);
+    toast.success('Dataset cleared');
   };
 
   // datasetSize is now managed via state and updated in useEffect
@@ -392,7 +396,7 @@ export function DatasetCapture({
                 <Button
                   onClick={handleOpenAnnotationTool}
                   variant="outline"
-                  className="flex-1 h-8 border-slate-600 text-black hover:bg-purple-900 hover:text-purple-400"
+                  className="flex-1 h-8 border-purple-600 bg-purple-600 text-white hover:bg-purple-700"
                 >
                   <Paintbrush className="size-3 mr-1.5" />
                   {groundTruthAnnotation ? 'Edit' : 'Annotate'}
@@ -401,7 +405,7 @@ export function DatasetCapture({
                 <Button
                   onClick={handleSave}
                   disabled={!courseName.trim() || isSaving}
-                  className="flex-1 h-8 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 disabled:text-slate-400"
+                  className="flex-1 h-8 bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-slate-600 disabled:text-slate-400"
                 >
                   {isSaving ? (
                     <>
@@ -445,18 +449,16 @@ export function DatasetCapture({
           <Button
             onClick={() => setShowExportDialog(true)}
             disabled={savedCount === 0}
-            variant="outline"
-            className="w-full border-slate-600 text-black hover:bg-slate-700"
+            className="w-full bg-slate-600 text-white hover:bg-slate-500 disabled:bg-slate-700 disabled:text-slate-500"
           >
             <Package className="size-4 mr-2" />
             Export Dataset
           </Button>
 
           <Button
-            onClick={handleClearDataset}
+            onClick={handleClearDatasetClick}
             disabled={savedCount === 0}
-            variant="outline"
-            className="w-full border-slate-600 text-black hover:bg-slate-700 hover:text-red-400"
+            className="w-full bg-slate-600 text-white hover:bg-red-700 disabled:bg-slate-700 disabled:text-slate-500"
           >
             <Trash2 className="size-4 mr-2" />
             Clear Session
@@ -515,6 +517,34 @@ export function DatasetCapture({
             >
               <X className="size-4 mr-2" />
               Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear Dataset Confirmation Dialog */}
+      <Dialog open={showClearDatasetConfirm} onOpenChange={setShowClearDatasetConfirm}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-slate-200">
+          <DialogHeader>
+            <DialogTitle>Clear Dataset?</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Are you sure you want to clear all {savedCount} saved entries? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowClearDatasetConfirm(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmClearDataset}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="size-4 mr-2" />
+              Clear All
             </Button>
           </DialogFooter>
         </DialogContent>
