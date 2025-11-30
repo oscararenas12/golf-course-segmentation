@@ -336,18 +336,18 @@ export function MapArea({
 
   // Update overlay when segmentation result or opacity changes
   useEffect(() => {
-    console.log('Overlay effect triggered:', {
-      hasMap: !!mapInstanceRef.current,
-      hasResult: !!segmentationResult,
-      hasBounds: !!overlayBoundsRef.current,
-      overlayDataLength: segmentationResult?.overlayData?.length || 0,
-    });
+    // Remove existing overlay first
+    if (overlayRef.current) {
+      overlayRef.current.setMap(null);
+      overlayRef.current = null;
+    }
 
-    if (mapInstanceRef.current && segmentationResult && segmentationResult.overlayData) {
-      // Remove existing overlay
-      if (overlayRef.current) {
-        overlayRef.current.setMap(null);
-      }
+    // If no result, we're done (overlay cleared)
+    if (!segmentationResult || !segmentationResult.overlayData) {
+      return;
+    }
+
+    if (mapInstanceRef.current) {
 
       // If no bounds were captured, create default bounds around current center
       let bounds = overlayBoundsRef.current;
