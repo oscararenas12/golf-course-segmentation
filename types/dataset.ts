@@ -30,7 +30,7 @@ export interface DatasetEntry {
     hasPrediction: boolean;
     hasGroundTruth: boolean;
     classDistribution: {
-      [key: string]: number;
+      [key: string]: number | { pixels: number; percentage: number };
     };
   };
   userNotes?: string;

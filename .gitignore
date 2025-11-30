@@ -92,3 +92,4 @@ api/.env
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+.vercel
