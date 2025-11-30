@@ -1,69 +1,63 @@
 # Golf Course Segmentation
 
-Deep learning project for semantic segmentation of golf course features from aerial imagery, with an interactive Next.js web application.
+Deep learning semantic segmentation of golf course features from aerial imagery, with an interactive Next.js web application.
 
 ## Overview
 
-This project combines machine learning and web development to create a comprehensive golf course analysis system:
+This project combines machine learning and web development for golf course analysis:
 
 **Machine Learning:**
-- U-Net architecture with ResNet50 encoder (TensorFlow/Keras)
-- Trained on 1,123 Danish golf course orthophotos
-- 6-class segmentation: Fairway, Green, Tee, Bunker, Water, Background
-- Resolution: 832×512 pixels (matching Aalborg University paper)
+- U-Net with ResNet50 encoder for 6-class segmentation
+- MobileNetV2 binary classifier for golf course detection
+- Trained on Danish golf course orthophotos + UC Merced dataset
+- Jupyter notebooks with Colab support
 
 **Web Application:**
-- Next.js 15 (App Router) + TypeScript
-- Google Maps API integration for satellite imagery
-- Two workflows: Dataset Creation & Segmentation Analysis
-- Real-time AI-powered golf course feature detection
+- Next.js 15 + TypeScript + Tailwind CSS
+- Google Maps satellite imagery integration
+- Three workflows: Dataset Creation, Classification Labeling, Segmentation Analysis
+- Real-time AI segmentation via HuggingFace Spaces API
+
+## Segmentation Classes
+
+| Class | Color | Description |
+|-------|-------|-------------|
+| Background | Black | Non-golf areas |
+| Fairway | Dark Green | Main playing surface |
+| Green | Bright Green | Putting surface |
+| Tee | Red | Teeing areas |
+| Bunker | Sandy Yellow | Sand traps |
+| Water | Blue | Water hazards |
 
 ## Project Structure
 
 ```
 golf-course-segmentation/
-├── app/                      # Next.js App Router
-│   ├── layout.tsx
-│   ├── page.tsx
-│   └── globals.css
-├── components/               # React components
-│   ├── Header.tsx
-│   ├── Sidebar.tsx
-│   ├── MapArea.tsx
-│   ├── WorkflowSelector.tsx
-│   ├── DatasetCapture.tsx
-│   ├── Legend.tsx
-│   └── ui/                   # ShadCN UI components
-├── types/                    # TypeScript types
-├── utils/                    # Utility functions
-├── public/                   # Static assets
-├── notebooks/                # ML training scripts
-│   ├── unet_golf_segmentation_tf.py
-│   └── paper_replication/
-│       ├── unet_resnet50_large.py
-│       ├── evaluate_resnet50_testset.py
-│       ├── test_resnet50_on_ucmerced.py
-│       └── test_custom_images.py
-├── models/                   # Trained .keras models
-├── predictions/              # Model outputs
-├── classifier/               # Binary golf/non-golf classifier
-└── api/                      # FastAPI backend (coming soon)
+├── app/                          # Next.js pages
+│   ├── page.tsx                  # Home - workflow selector
+│   ├── dataset/page.tsx          # Segmentation dataset creation
+│   ├── classification/page.tsx   # Binary labeling workflow
+│   └── segmentation/page.tsx     # AI segmentation analysis
+├── components/                   # React components
+│   ├── AnnotationCanvas.tsx      # Drawing tool for ground truth
+│   ├── MapArea.tsx               # Google Maps integration
+│   ├── DatasetCapture.tsx        # Dataset capture UI
+│   ├── ClassificationCapture.tsx # Binary labeling UI
+│   └── ui/                       # Shadcn UI components
+├── api/                          # FastAPI backend (HuggingFace Spaces)
+│   └── main.py                   # Segmentation API
+├── notebooks/                    # ML training
+│   └── unet_resnet50_large.ipynb # U-Net segmentation model
+├── classifier/                   # Classification model
+│   └── train_classifier.ipynb    # Binary golf classifier
+├── utils/                        # Utilities
+│   └── datasetStorage.ts         # IndexedDB operations
+└── types/                        # TypeScript types
 ```
 
 ## Getting Started
 
-### Prerequisites
-
-**For Web App:**
-- Node.js 18+ and npm/yarn/pnpm
-- Google Maps API key (optional but recommended)
-
-**For ML Training:**
-- Python 3.10+
-- TensorFlow 2.15+
-- GPU recommended (CUDA support)
-
-### Web Application Setup
+### Web Application
 
 1. **Install dependencies:**
 ```bash
@@ -72,12 +66,13 @@ npm install
 
 2. **Set up environment variables:**
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
-Edit `.env.local` and add your Google Maps API key:
+Add your Google Maps API key:
 ```
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key
+NEXT_PUBLIC_SEGMENTATION_API_URL=https://elo0oo0-golf-segmentation-api.hf.space
 ```
 
 3. **Run development server:**
@@ -87,142 +82,122 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-4. **Build for production:**
+### ML Training (Local or Colab)
+
+Both notebooks support Google Colab and local execution:
+
+**U-Net Segmentation Model:**
 ```bash
-npm run build
-npm start
+# Open in Jupyter or upload to Colab
+notebooks/unet_resnet50_large.ipynb
 ```
 
-### ML Model Training
-
-1. **Install Python dependencies:**
+**Binary Classifier:**
 ```bash
-# Using pip
-pip install tensorflow kagglehub pillow opencv-python numpy pandas matplotlib
-
-# Or using uv (recommended)
-uv sync
+classifier/train_classifier.ipynb
 ```
 
-2. **Train ResNet50 U-Net:**
+**Dependencies (auto-installed on Colab):**
 ```bash
-cd notebooks/paper_replication
-python unet_resnet50_large.py
+pip install tensorflow kagglehub datasets pillow numpy matplotlib
 ```
 
-3. **Evaluate on test set:**
-```bash
-python evaluate_resnet50_testset.py
-```
+## Workflows
 
-## Features
-
-### Web Application
-
-**Dataset Creation Mode:**
+### 1. Segmentation Dataset Creation (`/dataset`)
 - Capture satellite imagery from Google Maps
-- Build custom training datasets
-- Add metadata (course name, location)
-- Export as ZIP for model training
+- Annotate ground truth masks with 6-class brush tool
+- Auto-segment using trained U-Net model
+- Export ZIP with images, masks, and metadata CSV
 
-**Segmentation Analysis Mode:**
-- Real-time golf course feature detection
-- Interactive overlay with adjustable opacity
-- Statistics and class distribution
-- Color-coded legend
+### 2. Classification Dataset Creation (`/classification`)
+- Quick capture and binary labeling (Golf / Not Golf)
+- Track class balance statistics
+- Export ZIP with labeled folders
 
-### ML Model
+### 3. Segmentation Analysis (`/segmentation`)
+- Search any golf course location
+- One-click AI segmentation
+- Overlay visualization with opacity control
+- Per-class pixel statistics
 
-**Architecture:**
-- Encoder: ResNet50 (ImageNet pre-trained)
-- Decoder: Upsampling blocks with skip connections
-- Input: 832×512 RGB images
-- Output: 6-class segmentation mask
+## Model Architecture
 
-**Performance:**
-- Target: 42% mean IoU (ResNet50 baseline from paper)
-- Goal: Match paper's 69.6% mIoU with advanced encoders
+### U-Net (Segmentation)
+- **Encoder**: ResNet50 (ImageNet pretrained)
+- **Decoder**: Transposed convolutions with skip connections
+- **Input**: 832×512 RGB
+- **Output**: 6-class probability map
+- **Training**: Mixed precision (float16), AdamW optimizer
+
+### MobileNetV2 (Classification)
+- **Base**: MobileNetV2 (frozen, ImageNet pretrained)
+- **Head**: GlobalAveragePooling → Dense(128) → Dense(1, sigmoid)
+- **Input**: 224×224 RGB
+- **Output**: Binary probability (golf / not golf)
+
+## API
+
+The segmentation API is deployed on HuggingFace Spaces:
+
+**Endpoint:** `https://elo0oo0-golf-segmentation-api.hf.space`
+
+```bash
+# Health check
+GET /
+
+# Segment image (file upload)
+POST /segment
+Content-Type: multipart/form-data
+
+# Segment image (base64)
+POST /segment-base64
+Content-Type: application/json
+{"imageData": "data:image/jpeg;base64,..."}
+```
 
 ## Technology Stack
 
 **Frontend:**
 - Next.js 15 (App Router)
 - TypeScript
-- Tailwind CSS v4
-- ShadCN/UI components
+- Tailwind CSS
+- Radix UI / Shadcn
 - Google Maps JavaScript API
-- Lucide React icons
-- Recharts
+- IndexedDB (client-side storage)
 
-**Backend (Coming Soon):**
+**Backend:**
 - FastAPI
-- TensorFlow Serving
-- Python 3.10+
+- TensorFlow/Keras
+- HuggingFace Spaces
 
-**ML Framework:**
-- TensorFlow/Keras 2.15+
-- Mixed precision training (float16)
-- GPU acceleration (CUDA)
+**ML:**
+- TensorFlow 2.x
+- Mixed precision training
+- Kagglehub for dataset loading
 
-## Dataset
+## Datasets
 
-**Danish Golf Courses Orthophotos**
-- Source: [Kaggle Dataset](https://www.kaggle.com/datasets/jacotaco/danish-golf-courses-orthophotos)
-- 1,123 orthophotos from 107 Danish golf courses
-- Scale: 1:1000
-- 6-class semantic segmentation masks
+1. **Danish Golf Courses Orthophotos** (Kaggle)
+   - 1,123 orthophotos from 107 golf courses
+   - 6-class pixel-level annotations
+   - Used for segmentation training
 
-## Usage
+2. **UC Merced Land Use Dataset** (HuggingFace)
+   - 21 land use classes including golf
+   - Used for classification training
 
-### Creating a Dataset
+## References
 
-1. Select "Create a Dataset" from landing page
-2. Search or pan to a golf course
-3. Click "Capture Current View"
-4. Add metadata (name, location, notes)
-5. Click "Save to Dataset"
-6. Export as ZIP when ready
-
-### Running Segmentation
-
-1. Select "Run Segmentation" from landing page
-2. Position golf course within capture box
-3. Click "Segment Course"
-4. View overlay and statistics
-5. Adjust opacity/settings as needed
-
-## UI Design
-
-The web application UI was designed with Figma Make AI and converted to Next.js code.
-Original Figma design: https://www.figma.com/design/jKEfDiUpROQtVHkJj2bcgx/Golf-Course-Segmentation-UI
-
-## Development Roadmap
-
-- [x] Train ResNet50 U-Net model
-- [x] Build Next.js frontend with dual workflows
-- [x] Integrate Google Maps API
-- [x] Implement dataset capture & export
-- [ ] Create FastAPI backend for model serving
-- [ ] Connect frontend to backend API
-- [ ] Deploy to production (Vercel)
-- [ ] Expand to global golf courses
-- [ ] Improve model performance (target 69.6% mIoU)
-
-## Credits
-
-**Based on research by:**
-- Aalborg University: "Semantic Segmentation of Golf Courses for Course Rating Assistance" (IEEE ICMEW 2023)
-
-**Dataset:**
-- Kaggle: [Danish Golf Courses Orthophotos](https://www.kaggle.com/datasets/jacotaco/danish-golf-courses-orthophotos)
-
-**UI Design:**
-- Generated with Figma Make AI
+- [Danish Golf Courses Dataset](https://www.kaggle.com/datasets/jacotaco/danish-golf-courses-orthophotos)
+- [UC Merced Dataset](https://huggingface.co/datasets/blanchon/UC_Merced)
+- [U-Net Segmentation Notebook](https://www.kaggle.com/code/viniciussmatthiesen/semantic-segmentation-of-danish-golf-courses-u-net)
+- [MobileNets Paper](https://arxiv.org/abs/1704.04861)
 
 ## License
 
 MIT
 
-## Contributing
+## Contact
 
-Contributions welcome! Please open an issue or submit a PR.
+For access requests: oscar.arenas01@student.csulb.edu
